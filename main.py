@@ -1,8 +1,6 @@
 import streamlit as st
 import requests
 
-
-
 st.title("Conversor de Projetos Freelancer") 
 # campos que o usuário preenche/escolhe
 nome_projeto = st.text_input(label="Nome do Projeto") 
@@ -20,58 +18,62 @@ if tipo_moeda == "Tradicional" :
 else:
     moeda_origem = st.selectbox("Moeda de Origem", lista_moeda_cripto)
 
+# Dados para comunicação com api
 api_key_trad = "30a78cc1afa0ed31153a6960"
 api_url_trad = f"https://v6.exchangerate-api.com/v6/{api_key_trad}/pair/{moeda_origem}/BRL/{valor}"
 api_url_cripto = f"https://api.coingecko.com/api/v3/simple/price?vs_currencies=brl&symbols={moeda_origem}"
 
-# o streamlit fornece o st.session_state para que os dados sejam mantidos entre as interações com a página, como uma espécie de memória 
+# se ainda não existir a variável total_recebido na memória da sessão, cria ela - o st.session_state é utilizado para manter os dados entre as interações na página, sendo uma espeécie de memória
 if "total_recebido" not in st.session_state: 
-    st.session_state.total_recebido = 0.0 # se ainda não existir a variável total_recebido na memória da sessão, cria ela com valor inicial 0.0.
+    st.session_state.total_recebido = 0.0 
 
-if "historico" not in st.session_state:
-    st.session_state.historico = [] # mesma coisa, se ainda não existir, cria uma lista vazia
+if "historico_conversoes" not in st.session_state:
+    st.session_state.historico_conversoes = [] # mesma coisa, se ainda não existir, cria uma lista vazia
 
+# cria o botão de Converter e informa o que será feito ao clicar
 if st.button("Converter"):
 
+    # Faz uma verificação do tipo escolhido 
     if tipo_moeda == "Tradicional":
-        response = requests.get(api_url_trad)
+        response = requests.get(api_url_trad) # conecta com a api
 
-        if response.status_code == 200:
+        # se o retorno der certo, armazena a informação
+        if response.status_code == 200: 
             data = response.json()
-            valor_convertido = data["conversion_result"]
+            valor_recebido = data["conversion_result"]
 
-            conversao = f"{nome_projeto} - {valor} {moeda_origem} = R$ {valor_convertido:.2f}"
+            # agrupa os dados da conversão de valores
+            info_conversao = f"{nome_projeto} - {valor} {moeda_origem} = R$ {valor_recebido:.2f}"
 
-            st.session_state.historico.append(conversao)
-            st.session_state.total_recebido += valor_convertido
+            # armazena a conversão feita no histórico total
+            st.session_state.historico_conversoes.append(info_conversao)
+            # soma o valor recebido com a variável que controla o total
+            st.session_state.total_recebido += valor_recebido
 
-        
         else:
             st.error("Erro ao converter. Verifique a chave da API ou as moedas selecionadas.")
-    
+   
+   # mesmo processo do if anterior
     if tipo_moeda == "Cripto":
-
         response = requests.get(api_url_cripto)
 
         if response.status_code == 200:
-
             data = response.json()
+            valor_recebido = data[moeda_origem.lower()]["brl"] * valor
 
-            valor_convertido = data[moeda_origem.lower()]["brl"] * valor
+            valor_formatado = f"{valor_recebido:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            info_conversao = f"{nome_projeto} - {valor} {moeda_origem} = R$ {valor_formatado}"
 
-            valor_formatado = f"{valor_convertido:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            conversao = f"{nome_projeto} - {valor} {moeda_origem} = R$ {valor_formatado}"
+            st.session_state.historico_conversoes.append(info_conversao)
+            st.session_state.total_recebido += valor_recebido
 
-            st.session_state.historico.append(conversao)
-            st.session_state.total_recebido += valor_convertido
-
-        
+# cria a sessão para exibir o histórico        
 st.subheader("Histórico")        
 
-if st.session_state.historico:
-
+# se tiver alguma informação no histórico, exibe o valor total recebido e as conversões realizadas
+if st.session_state.historico_conversoes:
     valor_formatado = f"{st.session_state.total_recebido:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     st.success(f"Total recebido: R${valor_formatado}")
 
-    for item in st.session_state.historico:
+    for item in st.session_state.historico_conversoes:
         st.write("-", item)
